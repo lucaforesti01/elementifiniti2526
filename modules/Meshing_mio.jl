@@ -550,18 +550,18 @@ function get_Bk!(mesh::Mesh)
     # Richiama la matrice di connettività e i punti
     T = mesh.T;
     p = mesh.p;
-    Ntri = size(T,2);
+    
 
-    # Inizializza l'array di matrici Bk come array di componenti non specificate
+    # Inizializza l'array di matrici Bk come array vuoto
     # lo stesso per ak
-    Bk = Vector{Matrix{Float64}}(undef, Ntri);
-    ak = Vector{Matrix{Float64}}(undef, Ntri);
-    for i in 1:Ntri
+    Bk = Vector{Matrix{Float64}}();
+    ak = Vector{Vector{Float64}}();
+    for i in eachindex(axes(T,2))
         v1 = p[:,T[1,i]];
         v2 = p[:,T[2,i]];
         v3 = p[:,T[3,i]];
-        Bk[i] = [v2-v1 v3-v1];
-        ak[i] = v1;
+        push!(Bk, [v2-v1 v3-v1])
+        push!(ak, v1);
     end
     mesh.Bk = Bk; 
     mesh.ak = ak;
@@ -583,13 +583,13 @@ function get_detBk!(mesh::Mesh)
     ###########################################################################
     # Restituisce un array contenente i determinanti delle matrici di Bk
     ###########################################################################
-    T = mesh.T;
-    Ntri = size(T,2);
-    Bk = mesh.Bk;
+    
+    Bk, ak = get_Bk!(mesh);
+    l = length(Bk);
 
     # Inizializza l'array dei determinanti
-    detBk = zeros(Ntri);
-    for i in 1:Ntri
+    detBk = zeros(l);
+    for i in 1:l
         detBk[i] = det(Bk[i]);
     end
     mesh.detBk = detBk;
