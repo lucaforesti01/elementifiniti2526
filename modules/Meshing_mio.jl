@@ -554,13 +554,13 @@ function get_Bk!(mesh::Mesh)
 
     # Inizializza l'array di matrici Bk come array vuoto
     # lo stesso per ak
-    Bk = Vector{Matrix{Float64}}();
-    ak = Vector{Vector{Float64}}();
+    Bk = [];
+    ak = [];
     for i in eachindex(axes(T,2))
         v1 = p[:,T[1,i]];
         v2 = p[:,T[2,i]];
         v3 = p[:,T[3,i]];
-        push!(Bk, [v2-v1 v3-v1])
+        push!(Bk, [v2-v1 v3-v1]);
         push!(ak, v1);
     end
     mesh.Bk = Bk; 

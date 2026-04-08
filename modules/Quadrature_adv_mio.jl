@@ -93,7 +93,7 @@ function Quadrature(u, mesh::Mesh, ref_quad::TriQuad)
         T=0; # integrale sul singolo triangolo
         B = Bk[i];
         a = ak[i];
-        d = detBk[i];
+        d = abs(detBk[i]);
         for j in 1:q
             p = PQ[:,j];
             w = WQ[j];
@@ -109,7 +109,7 @@ function Quadrature(u, mesh::Mesh, ref_quad::TriQuad)
 
 
 end
-#=
+
 # Evaluation of a function
 """
     eval_u(u::Function, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
@@ -128,8 +128,18 @@ Evaluate a function at given points within an element.
 """
 function eval_u(u::Function, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
     ###########################################################################
-    ####################### PUT YOUR CODE HERE ################################
+    # Prende una matrice di punti e restituisce una matrice che contiene la 
+    # valutazione della funzione u su ognuno dei punti
     ###########################################################################
+    l = size(points_elem, 2);
+    u_evals = zeros(1,l);
+    for i in 1:l
+        p = points_elem[:, i];
+        u_evals[1, i] = u(p);
+    end
+
+    return u_evals
+
 end
 
 """
@@ -149,9 +159,32 @@ Evaluate a linear finite element solution at given quadrature points within an e
 """
 function eval_u(uh::Vector, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
     ###########################################################################
-    ####################### PUT YOUR CODE HERE ################################
+    # Prende il vettore uh che corrisponde all'approssimazione lineare della soluzione 
+    # su un elemento, valuta questa funzione sui nodi di quadratura del dato elemento
     ###########################################################################
+
+
+    # Punti di quadratura del metodo per il triangolo di riferimento:
+    PQ = quadrule.points
+
+    # Punti di quadratura del metodo per il triangolo generico trasformato: prende 
+    # ogni punto della matrice PQ e lo trasforma secondo la trasformazione dell'elemento 
+    # scelto: dipende dall'indice del triangolo tri_idx
+    T = mesh.T;
+    PT = PQ;
+    Bk, ak = get_Bk!(mesh);
+    for i in 1:size(PQ,2)
+        PT[:, i]= Bk[tri_idx]*PQ[:, i] + ak[tri_idx];
+    end
+
+    # Di tutti i valori di uh estraggo quelli che mi interessano, cioè dell'elemento (loc)
+    # corrispondente a tri_idx: 
+    uh_loc = [uh[i] for i in T[:, tri_idx]];
+
+    # Inizializza 
+    uh_evals = zeros(1,size(PT, 2));
+
+
+
 end
 
-
-=#
