@@ -46,9 +46,9 @@ W0 = [0.5];
 W1 = (1/6)*ones(3);
 W2 = (1/6)*ones(3);
 
-Q0_ref = TriQuad("Q0", 1, M0, W0);
-Q1_ref = TriQuad("Q1", 1, M1, W1);
-Q2_ref = TriQuad("Q2", 2, M2, W2);
+Q0_ref = TriQuad("Q0", 2, M0, W0);
+Q1_ref = TriQuad("Q1", 2, M1, W1);
+Q2_ref = TriQuad("Q2", 3, M2, W2);
 
 """
     Quadrature(u, mesh::Mesh, ref_quad::TriQuad)

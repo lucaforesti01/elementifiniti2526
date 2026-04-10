@@ -539,33 +539,8 @@ Compute and store the Bk matrices for the mesh.
 """
 function get_Bk!(mesh::Mesh)
     ###########################################################################
-    # Restituisce 
-    # - un array di matrici 2x2 in cui ogni matrice è la deformazione 
-    #   del triangolo di riferimento sul trinagolo della mesh.
-    # - una matrice in cui ogni colonna è il vettore di traslazione della 
-    #   trasformazione affine
+    ####################### PUT YOUR CODE HERE ################################
     ###########################################################################
-    
-    
-    # Richiama la matrice di connettività e i punti
-    T = mesh.T;
-    p = mesh.p;
-    Ntri = size(T,2);
-
-    # Inizializza l'array di matrici Bk come array di componenti non specificate
-    # lo stesso per ak
-    Bk = Vector{Matrix{Float64}}(undef, Ntri);
-    ak = Vector{Matrix{Float64}}(undef, Ntri);
-    for i in 1:Ntri
-        v1 = p[:,T[1,i]];
-        v2 = p[:,T[2,i]];
-        v3 = p[:,T[3,i]];
-        Bk[i] = [v2-v1 v3-v1];
-        ak[i] = v1;
-    end
-    mesh.Bk = Bk; 
-    mesh.ak = ak;
-    return Bk, ak
 end
 
 """
@@ -581,17 +556,6 @@ Compute and store the determinants of the Bk matrices for the mesh.
 """
 function get_detBk!(mesh::Mesh)
     ###########################################################################
-    # Restituisce un array contenente i determinanti delle matrici di Bk
+    ####################### PUT YOUR CODE HERE ################################
     ###########################################################################
-    T = mesh.T;
-    Ntri = size(T,2);
-    Bk = mesh.Bk;
-
-    # Inizializza l'array dei determinanti
-    detBk = zeros(Ntri);
-    for i in 1:Ntri
-        detBk[i] = det(Bk[i]);
-    end
-    mesh.detBk = detBk;
-    return detBk
 end
