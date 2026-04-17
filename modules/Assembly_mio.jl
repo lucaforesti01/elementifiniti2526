@@ -56,7 +56,8 @@ Compute the shape functions for the Poisson problem.
 """
 function shapef_2DLFE(quadrule::TriQuad)
     ###########################################################################
-    # ....
+    # restituisce i valori delle funzioni di base valutate sui punti di quadratura 
+    # di un metodo scelto 
     ########################################################################### 
     PQ = quadrule.points;
     shapef = zeros(3, size(PQ, 2));
@@ -80,6 +81,8 @@ Compute the gradients of the shape functions for the Poisson problem.
 """
 function ∇shapef_2DLFE(quadrule::TriQuad)
     ###########################################################################
+    # restituisce i valori dei gradienti delle funzioni di base valutate sui punti 
+    # di quadratura di un metodo scelto.
     # ... dipende solo dal numero dei punti di quadratura del triangolo di riferimento 
     # restituisce una matrice tridimensionale in cui ogni faccia è una copia dei gradienti 
     # delle funzioni di base (che sono costanti quindi ripetuti)
@@ -107,7 +110,54 @@ Assemble the local stiffness matrix and force vector for the Poisson problem.
 - `fe`: The assembled local force vector.
 """
 function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f)
-    ###########################################################################
-    ############################ ADD CODE HERE ################################
     ########################################################################### 
+    ###########################################################################
+    # richiama i punti della mesh nella matrice T
+    T = mesh.T;
+    p = mesh.p;
+    Bk, ak = get_Bk!(mesh);
+    Bk_inv = get_invBk!(mesh);
+    detBk = get_detBk!(mesh);
+
+    # TRIANGOLO LOCALE
+    a = ak[cell_index];
+    B = Bk[cell_index];
+    B_inv = Bk_inv[cell_index]; # inversa della matrice del triangolo dato in input
+    detB = detBk[cell_index]; # determinante della matrice del triangolo dato in input
+
+    # Seleziona le etichette dei vertici del triangolo dato in input in un vettore N
+    # N = T[:, cell_index];
+
+    #inizializza gli output
+    Ke = zeros(3,3);
+    fe = zeros(3);
+
+    # richiama i gradienti delle funzioni di base sul baricentro del triangolo di riferimento,
+    # per usarle nella quadratura per Ke
+    grad_Q0 = ∇shapef_2DLFE(Q0_ref);
+
+    # richiama i valori delle funzioni di base sui punti di quadratura di Q2_ref per calcolare fe
+    base_Q2 = shapef_2DLFE(Q2_ref);
+    for i =1:3
+        
+        Q2_W = Q2_ref.weights;
+        Q2_P = Q2_ref.points;
+        # fe[i] = (Q2_W)'*( f.( B.* Q2_P .+ a) .* base_Q2[i,:] )
+
+
+
+        for j = 1:3
+            # seleziona il gradiente dell'i-esima e j-esima funzione di base nel baricentro del triangolo di riferimento
+            ∇Q0_i = grad_Q0[:, i , :];
+            ∇Q0_j = grad_Q0[:, j , :];
+
+            # formula di quadratura punto medio (non dipende dal punto medio perché 
+            # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
+            # 1/2 = area triangolo di riferimento 
+            Ke[i,j] = 1/2 * abs(detB) * (    (B_inv' * ∇Q0_i)'*(B_inv' * ∇Q0_j)   );
+        end
+    end
+
+
+
 end

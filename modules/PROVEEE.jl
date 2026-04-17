@@ -62,4 +62,9 @@ function ∇shapef_2DLFE(quadrule::TriQuad)
 end
 
 
-∇shapef_2DLFE(Q0_ref)
+A = ∇shapef_2DLFE(Q0_ref)
+A[:,1, :]
+# prodotto scalare:
+# [1,2]'*[3, 4]
+
+[1, 2] .+1
