@@ -64,7 +64,15 @@ end
 
 A = ∇shapef_2DLFE(Q0_ref)
 A[:,1, :]
-# prodotto scalare:
-# [1,2]'*[3, 4]
 
-[1, 2] .+1
+
+B = [1 2 ; 3. 4]
+C = [1 2 3 4 5; 6 7 8 9 10]
+
+D = B*C
+H = D .+[1, 1]
+f(x, y) = x^2 + y^2;
+v = map(col -> f(col[1], col[2]), eachcol(C))
+
+
+dot( [1, 1, 1, 1, 1], C[1, :].*[2, 2, 2, 2, 2])

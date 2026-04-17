@@ -34,8 +34,42 @@ Assemble the global stiffness matrix and force vector for the given mesh using t
 """
 function assemble_global(mesh::Mesh, local_assembler!)
     ###########################################################################
-    ############################ ADD CODE HERE ################################
     ########################################################################### 
+    T = mesh.T;
+    p = mesh.p;
+    Ntri = size(T,2);
+    Npoints = size(p,2);
+
+    rows = []
+    cols = []
+    data = Float64[]
+    
+    row_fe = []
+    data_fe = Float64[]
+
+    A_loc = zeros(3,3);
+    fe_loc = zeros(3);
+    for k in 1:Ntri
+        local_assembler!(A_loc, fe_loc, mesh, k);
+        indices = T[:, k];
+        for i in 1:3
+            i_glob = indices[i];
+            for j in 1:3
+                j_glob = indices[j];
+                push!(rows, i_glob); # indici di riga
+                push!(cols, j_glob); # indici di colonna
+                push!(data, A_loc[i,j]); # dati corrispondenti sommati direttamente
+            end
+
+            push!(row_fe, i_glob);
+            push!(data_fe, fe_loc[i]);
+        end
+    end
+    A_glob = sparse(rows, cols, data, Npoints, Npoints);
+    fe_glob = sparse(row_fe, ones(size(row_fe)), data_fe);
+
+    return A_glob, fe_glob 
+
 end
 
 ########################################################################
@@ -129,8 +163,9 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
     # N = T[:, cell_index];
 
     #inizializza gli output
-    Ke = zeros(3,3);
-    fe = zeros(3);
+    fill!(Ke, 0)
+    fill!(fe, 0)
+
 
     # richiama i gradienti delle funzioni di base sul baricentro del triangolo di riferimento,
     # per usarle nella quadratura per Ke
@@ -140,9 +175,13 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
     base_Q2 = shapef_2DLFE(Q2_ref);
     for i =1:3
         
-        Q2_W = Q2_ref.weights;
-        Q2_P = Q2_ref.points;
-        # fe[i] = (Q2_W)'*( f.( B.* Q2_P .+ a) .* base_Q2[i,:] )
+        W2 = Q2_ref.weights # pesi i quadratura
+        P2 = Q2_ref.points # punti di quadratura
+        # calcola la Fe[i] sommando i valori moltiplicati per i pesi di
+        for k = 1:size(P2, 2)
+            fe[i]+= W2[k] * f(B * P2[:, k] + a) * base_Q2[i, k] * abs(detB);
+        end 
+
 
 
 
@@ -154,7 +193,7 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
             # formula di quadratura punto medio (non dipende dal punto medio perché 
             # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
             # 1/2 = area triangolo di riferimento 
-            Ke[i,j] = 1/2 * abs(detB) * (    (B_inv' * ∇Q0_i)'*(B_inv' * ∇Q0_j)   );
+            Ke[i,j] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j)   );
         end
     end
 
