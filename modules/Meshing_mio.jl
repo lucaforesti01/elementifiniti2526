@@ -1,9 +1,11 @@
 # Author: Ivan Bioli (https://github.com/IvanBioli)
 # Inspired by code written by Jochen Hinz (https://github.com/JochenHinz) for MATH-451 @ EPFL
 
+using Gridap
 import Meshes, CairoMakie
 import Gmsh: gmsh
 using LinearAlgebra
+import TriplotRecipes
 import PlotlyJS
 
 import Gmsh: gmsh
@@ -554,14 +556,14 @@ function get_Bk!(mesh::Mesh)
 
         # Inizializza l'array di matrici Bk come array vuoto
         # lo stesso per ak
-        Bk = [];
-        ak = [];
+        Bk = zeros(Float64, 2, 2, size(T,2));
+        ak = zeros(Float64, 2, size(T,2));
         for i in eachindex(axes(T,2))
             v1 = p[:,T[1,i]];
             v2 = p[:,T[2,i]];
             v3 = p[:,T[3,i]];
-            push!(Bk, [v2-v1 v3-v1]);
-            push!(ak, v1);
+            ak[:, i] = v1
+            Bk[:,:,i] = [v2-v1 v3-v1]
         end
         mesh.Bk, mesh.ak = Bk, ak
     end 
@@ -585,12 +587,12 @@ function get_detBk!(mesh::Mesh)
     ###########################################################################
     if isnothing(mesh.detBk)
         Bk, ak = get_Bk!(mesh);
-        l = length(Bk);
+        l = size(Bk,3);
 
         # Inizializza l'array dei determinanti
         detBk = zeros(l);
         for i in 1:l
-            detBk[i] = det(Bk[i]);
+            detBk[i] = det(Bk[:, :, i]);
         end
         mesh.detBk = detBk;
     end 
@@ -614,9 +616,9 @@ function get_invBk!(mesh::Mesh)
     ########################################################################### 
     if isnothing(mesh.invBk)
         Bk, _ = get_Bk!(mesh);
-        invBk = [];
-        for i in eachindex(Bk)
-            push!(invBk, inv(Bk[i]));
+        invBk = zeros(Float64, 2, 2, size(Bk,3));;
+        for i in eachindex(axes(Bk,3))
+            invBk[:, :, i] = inv(Bk[:, :, i]);
         end 
         mesh.invBk = invBk
     end 

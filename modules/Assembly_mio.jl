@@ -72,6 +72,41 @@ function assemble_global(mesh::Mesh, local_assembler!)
 
 end
 
+"""
+    impose_dirichlet(A, b, g, mesh)
+
+Impose Dirichlet boundary conditions on the system.
+
+# Arguments
+- `A`: The global stiffness matrix.
+- `b`: The global force vector.
+- `g`: The Dirichlet boundary condition function.
+- `mesh::Mesh`: The mesh object.
+
+# Returns
+- `A_cond`: The modified stiffness matrix with Dirichlet conditions imposed.
+- `b_cond`: The modified force vector with Dirichlet conditions imposed.
+- `uh`: The solution vector with Dirichlet conditions applied.
+"""
+function impose_dirichlet(A, b, g, mesh)
+    ###########################################################################
+    F = mesh.freedofs;
+    D = mesh.dirichletdofs;
+    T = mesh.T
+    pd = T[:,D]; # punti di bordo (coordinate)
+    pd_g = pd;
+    # for col in eachcol(pd)
+    #     pd_g[:, col] = g(pd[:, col]);
+    # end
+
+    
+
+    A_cond = A[F,F];
+    b_cond = b[F] - A[F,D]
+    
+
+end
+
 ########################################################################
 ########################### LOCAL ASSEMBLERS ###########################
 ########################################################################
@@ -95,7 +130,7 @@ function shapef_2DLFE(quadrule::TriQuad)
     ########################################################################### 
     PQ = quadrule.points;
     shapef = zeros(3, size(PQ, 2));
-    shapef[1, :] = 1 .- PQ[1, :] .- PQ[2, :];
+    shapef[1, :] = 1 .- PQ[1, :] .- PQ[2, :]; # φ1 = 1 - x - y
     shapef[2, :] = PQ[1, :];
     shapef[3, :] = PQ[2, :];
 
@@ -154,9 +189,9 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
     detBk = get_detBk!(mesh);
 
     # TRIANGOLO LOCALE
-    a = ak[cell_index];
-    B = Bk[cell_index];
-    B_inv = Bk_inv[cell_index]; # inversa della matrice del triangolo dato in input
+    a = ak[:, cell_index];
+    B = Bk[:, :, cell_index];
+    B_inv = Bk_inv[:, :, cell_index]; # inversa della matrice del triangolo dato in input
     detB = detBk[cell_index]; # determinante della matrice del triangolo dato in input
 
     # Seleziona le etichette dei vertici del triangolo dato in input in un vettore N
@@ -173,17 +208,14 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
 
     # richiama i valori delle funzioni di base sui punti di quadratura di Q2_ref per calcolare fe
     base_Q2 = shapef_2DLFE(Q2_ref);
+    W2 = Q2_ref.weights # pesi i quadratura
+    P2 = Q2_ref.points # punti di quadratura
+
     for i =1:3
-        
-        W2 = Q2_ref.weights # pesi i quadratura
-        P2 = Q2_ref.points # punti di quadratura
         # calcola la Fe[i] sommando i valori moltiplicati per i pesi di
-        for k = 1:size(P2, 2)
+        for k in eachindex(W2)
             fe[i]+= W2[k] * f(B * P2[:, k] + a) * base_Q2[i, k] * abs(detB);
         end 
-
-
-
 
         for j = 1:3
             # seleziona il gradiente dell'i-esima e j-esima funzione di base nel baricentro del triangolo di riferimento

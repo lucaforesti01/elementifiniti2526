@@ -36,7 +36,7 @@ M0[2,1]=1/3;
 
 M1 = [0 1 0; 0 0 1];
 
-M2 = [0.5 0 0.5; 0.5 0.5 0];
+M2 = [0.5 0 0.5; 0 0.5 0.5];
 
 ###########################################################################
 # Definisco i vettori dei pesi di quadratura per le formule Q0, Q1, Q2.
@@ -91,8 +91,8 @@ function Quadrature(u, mesh::Mesh, ref_quad::TriQuad)
 
     for i in eachindex(axes(Tri,2))
         T=0; # integrale sul singolo triangolo
-        B = Bk[i];
-        a = ak[i];
+        B = Bk[:, :, i];
+        a = ak[:, i];
         d = abs(detBk[i]);
         for j in 1:q
             p = PQ[:,j];
@@ -186,5 +186,46 @@ function eval_u(uh::Vector, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, q
 
 
 
+end
+
+
+"""
+    L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
+
+Compute the L2 error between a function and a finite element solution over a mesh.
+
+# Arguments
+- `u::Function`: The exact solution function.
+- `uh::Vector`: The finite element solution vector.
+- `mesh::Mesh`: The mesh object.
+- `ref_quad::TriQuad`: The reference quadrature rule.
+
+# Returns
+- `L2_error::Float64`: The L2 error between the exact solution and the finite element solution.
+"""
+function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
+    ###########################################################################
+    ############################ ADD CODE HERE ################################
+    ########################################################################### 
+end
+
+"""
+    H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
+
+Compute the H1 semi-norm error between the gradient of a function and a finite element solution over a mesh.
+
+# Arguments
+- `∇u::Function`: The gradient of the exact solution function.
+- `uh::Vector`: The finite element solution vector.
+- `mesh::Mesh`: The mesh object.
+- `ref_quad::TriQuad`: The reference quadrature rule.
+
+# Returns
+- `H1_semi_error::Float64`: The H1 semi-norm error between the gradient of the exact solution and the finite element solution.
+"""
+function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
+    ###########################################################################
+    ############################ ADD CODE HERE ################################
+    ########################################################################### 
 end
 
