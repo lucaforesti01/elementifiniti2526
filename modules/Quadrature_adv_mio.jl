@@ -205,8 +205,49 @@ Compute the L2 error between a function and a finite element solution over a mes
 """
 function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
     ###########################################################################
-    ############################ ADD CODE HERE ################################
-    ########################################################################### 
+    # restituisce l'errore in norm L2 
+    ###########################################################################
+    W = ref_quad.weights;
+    Q = ref_quad.points;
+    Bk, ak = get_Bk!(mesh);
+    det_Bk = get_detBk!(mesh);
+    T = mesh.T;
+
+    # valutazioni delle funzioni di base sui punti di quadratura di riferimento
+    φ_val = shapef_2DLFE(ref_quad);
+
+    L2_error_square = 0 
+    # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
+    for t in size(T,2)
+
+        # richiama le quantità sull'elemento t fissato
+        a = ak[:, t];
+        B = Bk[:,:, t];
+        det_B = det_Bk[t]
+        
+        # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
+        uh_t = uh[T[:,t]];
+
+        # ciclo sui punti di quadratura
+        for j = 1:size(Q,2)
+            q = Q[:, j]
+
+            
+            φ_j =  φ_val[:,j] # tutte le funzioni di base, valutate sul j-esimo punto di quadratura
+            uh_val_j = dot(uh_t, φ_j) # valutazione della funzione approssimata uh sul j-esimo punto di quadratura (uh combinazione delle φi)
+
+
+            L2_error_square += abs(det_B)* W[j] * (abs(   u( B*q + a) -  uh_val_j ))^2 
+        end 
+
+
+    end
+
+    # Calcola l'errore come la radice quadrata dell'integrale
+    L2_error = sqrt(L2_error_square);
+    return L2_error
+
+
 end
 
 """
@@ -225,7 +266,56 @@ Compute the H1 semi-norm error between the gradient of a function and a finite e
 """
 function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
     ###########################################################################
-    ############################ ADD CODE HERE ################################
+    # Calcola l'errore in seminorma H1
     ########################################################################### 
+    W = ref_quad.weights;
+    Q = ref_quad.points;
+    Bk, ak = get_Bk!(mesh);
+    det_Bk = get_detBk!(mesh);
+    inv_Bk = get_invBk!(mesh);
+    T = mesh.T;
+
+    # valutazioni dei gradienti delle funzioni di base sui punti di quadratura di riferimento
+    ∇φ_val = ∇shapef_2DLFE(ref_quad)
+
+    H1_semi_error_square = 0 
+    # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
+    for t in size(T,2)
+
+        # richiama le quantità sull'elemento t fissato
+        a = ak[:, t];
+        B = Bk[:,:, t];
+        inv_B = inv_Bk[:, :, t];
+        det_B = det_Bk[t]
+        
+        # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
+        uh_t = uh[T[:,t]];
+
+        # ciclo sui punti di quadratura
+        for j = 1:size(Q,2)
+            q = Q[:, j] # j-esimo punto di quadratura sul triangolo di riferimento
+
+            # somma sui vertici del triangolo dei valori di uh e dei gradienti delle funzioni di base
+            ∇uh_j = zeros(2)
+            for i =1:3
+                ∇uh_j += uh_t[i] * ( (inv_B)'* ∇φ_val[:,i,j]   );
+            end 
+
+
+
+            H1_semi_error_square += abs(det_B)* W[j] * (norm(   ∇u( B*q + a) -  ∇uh_j ))^2 
+        end 
+
+
+    end
+
+    # Calcola l'errore come la radice quadrata dell'integrale
+    H1_semi_error = sqrt(H1_semi_error_square);
+    return H1_semi_error
+
+
+
+
+
 end
 

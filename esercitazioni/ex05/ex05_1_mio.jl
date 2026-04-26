@@ -1,7 +1,7 @@
 # Author: Ivan Bioli (https://github.com/IvanBioli)
 begin
     import Pkg
-    # Pkg.activate("elementifinitiunipv_pkg")
+    Pkg.activate("elementifinitiunipv_pkg")
     using Revise
 
     # Load the necessary files
@@ -50,7 +50,7 @@ for (i, h) in enumerate(msh_sizes)
 
     # Compute Linfity error
     Ih_uexact = dropdims(mapslices(u_exact, msh.p; dims=1); dims=1) # Interpolation of the exact solution
-    Linf_error[i] = norm(Ih_uexact - uh, Inf)
+    #Linf_error[i] = norm(Ih_uexact - uh, Inf)
     L2Q0_error[i] = L2error(u_exact, uh, msh, Q0_ref)
     L2Q2_error[i] = L2error(u_exact, uh, msh, Q2_ref)
     H1Q0_error[i] = sqrt(H1semierror(∇u_exact, uh, msh, Q0_ref)^2 + L2Q0_error[i]^2)

@@ -66,7 +66,7 @@ function assemble_global(mesh::Mesh, local_assembler!)
         end
     end
     A_glob = sparse(rows, cols, data, Npoints, Npoints);
-    fe_glob = sparse(row_fe, ones(size(row_fe)), data_fe);
+    fe_glob = Matrix(sparse(row_fe, ones(size(row_fe)), data_fe));
 
     return A_glob, fe_glob 
 
@@ -93,16 +93,20 @@ function impose_dirichlet(A, b, g, mesh)
     F = mesh.freedofs;
     D = mesh.dirichletdofs;
     T = mesh.T
-    pd = T[:,D]; # punti di bordo (coordinate)
-    pd_g = pd;
-    # for col in eachcol(pd)
-    #     pd_g[:, col] = g(pd[:, col]);
-    # end
+    p = mesh.p
+    pd = p[:,T[D]]; # punti di bordo (coordinate)
 
-    
+    A_cond = A[F,F];  # sottomatrice di stiffness corrispondente ai punti interni alla mesh
+    b_cond = b[F] - A[F,D] * g.(eachcol(pd)); # load vector corrispondente ai punti interni alla mesh
 
-    A_cond = A[F,F];
-    b_cond = b[F] - A[F,D]
+    u_f = A_cond\b_cond;
+
+    # Definisce il vettore uh inserendo negli indici F il vettore u_f e negli indici D la funzione g calcolata sui punti del bordo di Dirichlet
+    uh = zeros(size(T,2));
+    uh[F] = u_f
+    uh[D]= g.(eachcol(pd))
+
+    return A_cond, b_cond, uh
     
 
 end
@@ -231,4 +235,56 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
 
 
 
+end
+
+
+########################### TRANSPORT PROBLEM ###########################
+"""
+    transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
+
+Assemble the local stiffness matrix and force vector for the transport problem.
+
+# Arguments
+- `Ke::Matrix`: The local stiffness matrix to be assembled.
+- `fe::Vector`: The local force vector to be assembled.
+- `mesh::Mesh`: The mesh object.
+- `cell_index::Integer`: The index of the current cell.
+- `f`: The source term function.
+- `k`: The diffusion coefficient function.
+- `β`: The advection velocity function.
+- `stab`: The stabilization method (optional).
+- `δ`: The stabilization parameter (optional).
+
+# Returns
+- `Ke`: The assembled local stiffness matrix.
+- `fe`: The assembled local force vector.
+"""
+function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
+    ###########################################################################
+    ############################ ADD CODE HERE ################################
+    ########################################################################### 
+end
+
+########################### DARCY PROBLEM ###########################
+"""
+    darcy_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k)
+
+Assemble the local stiffness matrix and force vector for the Darcy problem.
+
+# Arguments
+- `Ke::Matrix`: The local stiffness matrix to be assembled.
+- `fe::Vector`: The local force vector to be assembled.
+- `mesh::Mesh`: The mesh object.
+- `cell_index::Integer`: The index of the current cell.
+- `f`: The source term function.
+- `k`: The permeability coefficient function.
+
+# Returns
+- `Ke`: The assembled local stiffness matrix.
+- `fe`: The assembled local force vector.
+"""
+function darcy_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k)
+    ###########################################################################
+    ############################ ADD CODE HERE ################################
+    ########################################################################### 
 end
