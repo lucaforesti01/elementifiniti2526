@@ -34,7 +34,7 @@ for (i, h) in enumerate(msh_sizes)
     # Build the mesh with mesh-size h    
     out_file = mesh_circle(h)
     T, p = get_nodes_connectivity(out_file)
-    msh = Mesh(T, p)
+    msh = Mesh(T, p)  ##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! non mi tornano le dimensioni di T e di p (T ha dim (3,64), p ha dim (2,41))
     # Get Dirichlet dofs
     bnd_tags, bnd_coords = get_boundary_nodes(out_file)
     set_dirichletdofs!(msh, bnd_tags)
@@ -50,7 +50,7 @@ for (i, h) in enumerate(msh_sizes)
 
     # Compute Linfity error
     Ih_uexact = dropdims(mapslices(u_exact, msh.p; dims=1); dims=1) # Interpolation of the exact solution
-    #Linf_error[i] = norm(Ih_uexact - uh, Inf)
+    Linf_error[i] = norm(Ih_uexact - uh, Inf)
     L2Q0_error[i] = L2error(u_exact, uh, msh, Q0_ref)
     L2Q2_error[i] = L2error(u_exact, uh, msh, Q2_ref)
     H1Q0_error[i] = sqrt(H1semierror(∇u_exact, uh, msh, Q0_ref)^2 + L2Q0_error[i]^2)
