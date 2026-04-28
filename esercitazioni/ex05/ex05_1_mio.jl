@@ -34,7 +34,7 @@ for (i, h) in enumerate(msh_sizes)
     # Build the mesh with mesh-size h    
     out_file = mesh_circle(h)
     T, p = get_nodes_connectivity(out_file)
-    msh = Mesh(T, p)  ##### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! non mi tornano le dimensioni di T e di p (T ha dim (3,64), p ha dim (2,41))
+    msh = Mesh(T, p)  
     # Get Dirichlet dofs
     bnd_tags, bnd_coords = get_boundary_nodes(out_file)
     set_dirichletdofs!(msh, bnd_tags)

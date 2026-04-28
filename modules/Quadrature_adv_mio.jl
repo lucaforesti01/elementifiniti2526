@@ -230,7 +230,7 @@ function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
 
         # ciclo sui punti di quadratura
         for j = 1:size(Q,2)
-            q = Q[:, j]
+            q = Q[:, j] # j-esimo punto di quadratura
 
             
             φ_j =  φ_val[:,j] # tutte le funzioni di base, valutate sul j-esimo punto di quadratura

@@ -102,7 +102,7 @@ function impose_dirichlet(A, b, g, mesh)
     u_f = A_cond\b_cond;
 
     # Definisce il vettore uh inserendo negli indici F il vettore u_f e negli indici D la funzione g calcolata sui punti del bordo di Dirichlet
-    uh = zeros(size(T,2));
+    uh = zeros(size(p,2));
     uh[F] = u_f
     uh[D]= g.(eachcol(pd))
 
