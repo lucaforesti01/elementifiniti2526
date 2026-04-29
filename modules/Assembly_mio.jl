@@ -262,7 +262,56 @@ Assemble the local stiffness matrix and force vector for the transport problem.
 function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
     ###########################################################################
     ############################ ADD CODE HERE ################################
-    ########################################################################### 
+    ###########################################################################
+    # richiama i punti della mesh nella matrice T
+    T = mesh.T;
+    p = mesh.p;
+    Bk, ak = get_Bk!(mesh);
+    Bk_inv = get_invBk!(mesh);
+    detBk = get_detBk!(mesh);
+
+    # TRIANGOLO LOCALE
+    a = ak[:, cell_index];
+    B = Bk[:, :, cell_index];
+    B_inv = Bk_inv[:, :, cell_index]; # inversa della matrice del triangolo dato in input
+    detB = detBk[cell_index]; # determinante della matrice del triangolo dato in input
+
+    # Seleziona le etichette dei vertici del triangolo dato in input in un vettore N
+    # N = T[:, cell_index];
+
+    #inizializza gli output
+    fill!(Ke, 0)
+    fill!(fe, 0)
+
+
+    # richiama i gradienti delle funzioni di base sul baricentro del triangolo di riferimento,
+    # per usarle nella quadratura per Ke
+    grad_Q0 = ∇shapef_2DLFE(Q0_ref);
+
+    # richiama i valori delle funzioni di base sui punti di quadratura di Q2_ref per calcolare fe
+    base_Q2 = shapef_2DLFE(Q2_ref);
+    W2 = Q2_ref.weights # pesi i quadratura
+    P2 = Q2_ref.points # punti di quadratura
+
+    for i =1:3
+        # calcola la Fe[i] sommando i valori moltiplicati per i pesi di
+        for l in eachindex(W2)
+            fe[i]+= W2[l] * f(B * P2[:, l] + a) * base_Q2[i, l] * abs(detB);
+        end 
+
+        for j = 1:3
+            # seleziona il gradiente dell'i-esima e j-esima funzione di base nel baricentro del triangolo di riferimento
+            ∇Q0_i = grad_Q0[:, i , :];
+            ∇Q0_j = grad_Q0[:, j , :];
+
+            # formula di quadratura punto medio (non dipende dal punto medio perché 
+            # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
+            # 1/2 = area triangolo di riferimento 
+            Ke[i,j] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j)   );
+        end
+    end
+
+
 end
 
 ########################### DARCY PROBLEM ###########################
@@ -285,6 +334,56 @@ Assemble the local stiffness matrix and force vector for the Darcy problem.
 """
 function darcy_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k)
     ###########################################################################
-    ############################ ADD CODE HERE ################################
-    ########################################################################### 
+    ###########################################################################
+    # richiama i punti della mesh nella matrice T
+    T = mesh.T;
+    p = mesh.p;
+    Bk, ak = get_Bk!(mesh);
+    Bk_inv = get_invBk!(mesh);
+    detBk = get_detBk!(mesh);
+
+    # TRIANGOLO LOCALE
+    a = ak[:, cell_index];
+    B = Bk[:, :, cell_index];
+    B_inv = Bk_inv[:, :, cell_index]; # inversa della matrice del triangolo dato in input
+    detB = detBk[cell_index]; # determinante della matrice del triangolo dato in input
+
+    # Seleziona le etichette dei vertici del triangolo dato in input in un vettore N
+    # N = T[:, cell_index];
+
+    #inizializza gli output
+    fill!(Ke, 0)
+    fill!(fe, 0)
+
+
+    # richiama i gradienti delle funzioni di base sul baricentro del triangolo di riferimento,
+    # per usarle nella quadratura per Ke
+    grad_Q0 = ∇shapef_2DLFE(Q0_ref);
+
+    # richiama i valori delle funzioni di base sui punti di quadratura di Q2_ref per calcolare fe
+    base_Q2 = shapef_2DLFE(Q2_ref);
+    W2 = Q2_ref.weights # pesi i quadratura
+    P2 = Q2_ref.points # punti di quadratura
+    P0 = Q0_ref.points;
+    P0_trasf = B * P0 .+ a;
+
+    for i =1:3
+        # calcola la Fe[i] sommando i valori moltiplicati per i pesi di
+        for k in eachindex(W2)
+            fe[i]+= W2[k] * f(B * P2[:, k] + a) * base_Q2[i, k] * abs(detB);
+        end 
+
+        for j = 1:3
+            # seleziona il gradiente dell'i-esima e j-esima funzione di base nel baricentro del triangolo di riferimento
+            ∇Q0_i = grad_Q0[:, i , :];
+            ∇Q0_j = grad_Q0[:, j , :];
+
+            # formula di quadratura punto medio (non dipende dal punto medio perché 
+            # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
+            # 1/2 = area triangolo di riferimento 
+            Ke[i,j] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j) * k(P0_trasf)  );
+        end
+    end
+
+ 
 end
