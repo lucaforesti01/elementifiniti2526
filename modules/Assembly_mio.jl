@@ -261,7 +261,7 @@ Assemble the local stiffness matrix and force vector for the transport problem.
 """
 function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
     ###########################################################################
-    ############################ ADD CODE HERE ################################
+    # Problema della rampa
     ###########################################################################
     # richiama i punti della mesh nella matrice T
     T = mesh.T;
@@ -292,11 +292,17 @@ function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_inde
     base_Q2 = shapef_2DLFE(Q2_ref);
     W2 = Q2_ref.weights # pesi i quadratura
     P2 = Q2_ref.points # punti di quadratura
+    P2_trasf = B * P2 .+ a;
 
     for i =1:3
-        # calcola la Fe[i] sommando i valori moltiplicati per i pesi di
+        # calcola la Fe[i] sommando i valori moltiplicati per i pesi di quadratura
         for l in eachindex(W2)
-            fe[i]+= W2[l] * f(B * P2[:, l] + a) * base_Q2[i, l] * abs(detB);
+            fe[i]+= W2[l] * f(P2_trasf[:, l]) * base_Q2[i, l] * abs(detB);
+
+            
+
+
+
         end 
 
         for j = 1:3
