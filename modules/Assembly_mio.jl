@@ -94,7 +94,7 @@ function impose_dirichlet(A, b, g, mesh)
     D = mesh.dirichletdofs;
     T = mesh.T
     p = mesh.p
-    pd = p[:,T[D]]; # punti di bordo (coordinate)
+    pd = p[:, D]; # punti di bordo (coordinate)
 
     A_cond = A[F,F];  # sottomatrice di stiffness corrispondente ai punti interni alla mesh
     b_cond = b[F] - A[F,D] * g.(eachcol(pd)); # load vector corrispondente ai punti interni alla mesh
