@@ -260,76 +260,40 @@ Assemble the local stiffness matrix and force vector for the transport problem.
 - `fe`: The assembled local force vector.
 """
 function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
-    ###########################################################################
-    # Problema della rampa
-    ###########################################################################
-
-    # inizializza a zero gli output, stiffness locale e load vector
+    n_basefuncs = 3
+    # Reset to 0
     fill!(Ke, 0)
     fill!(fe, 0)
-
-    # richiama la formula di quadratura da utilizzare
+    # FIXME: It is sufficient to use Q0 quadrule to assemble the stiffness matrix exactly,
+    # but here we show how to use a more general quadrature rule like Q2    
     quadrule = Q2_ref
-
-    # richiama le trasformazioni dal triangolo di riferimento al triangolo della mesh
-    Bk, ak = get_Bk!(mesh);
-    invBk = get_invBk!(mesh);
-    detBk = get_detBk!(mesh);
-
-    # sul triangolo della mesh
-    B = Bk[:, :, cell_index];
-    a = ak[:, cell_index];
-    invB = invBk[:, :, cell_index];
-    detB = detBk[cell_index];
-
-
-    # trasforma i punti di quadratura sul triangolo selezionato
-    pe = B * quadrule.points .+ a;
-
-    # calcola le funzioni di base sui punti di quadratura (già trasformato tanto è uguale)
-    φe = shapef_2DLFE(quadrule);
-
-    # calcola i gradienti delle funzioni di base sui punti di quadratura e poi li trasforma
-    ∇φ = ∇shapef_2DLFE(quadrule);
-    ∇φe = mapslices(x -> invB' * x, ∇shapef_2DLFE(quadrule), dims=(1, 2)); # matrice 2x3xquad.points con le facce tutte uguali contenente i gradienti trasformati
-
-    for p = 1:size(quadrule.points, 2)
-        # peso di quadratura riscalato moltiplicando per il valore assoluto del determinante della matrice di trasformazione
-        dΩ = quadrule.weights[p] * abs(detB);
-        # calcola la funzione ε sul punto di quadratura p trasformato
-        ε = k(pe[:, p]);
-        # calcola la funzione β sul punto di quadratura p trasformato
-        βp = β(pe[:, p]);
-
-        for i = 1:3
-            # calcola l' i-esima funzione di base sul punto p di quadratura 
-            v = φe[i, p]; 
-            # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
-            ∇v = ∇φe[:,i, p];
-
-            # aggiorna il load vector
-            fe[i] += f(pe[:, p]) * v * dΩ;
-
-            for j = 1:3
-                # calcola la j-esima funzione di base sul punto p di quadratura 
-                u = φe[j, p]; 
-                # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
-                ∇u = ∇φe[:,j, p];
-
-                # aggiorna la matrice di stiffness
-                Ke[i,j] += ((∇v ⋅ ∇u) * ε + (βp ⋅ ∇v) * u ) * dΩ
-
-            end 
-
-        end 
-
-
-
-    end 
-
-    
+    points_e = mesh.Bk[:, :, cell_index] * quadrule.points .+ mesh.ak[:, cell_index]
+    # Evaluate basis functions and their gradient
+    shapef = shapef_2DLFE(quadrule)
+    invBk = mesh.invBk[:, :, cell_index]
+    ∇shapef = mapslices(x -> invBk' * x, ∇shapef_2DLFE(quadrule), dims=(1, 2))
+    # Loop over quadrature points
+    for (q_index, q_point) in enumerate(eachcol(points_e))
+        # Get the quadrature weight
+        dΩ = quadrule.weights[q_index] * mesh.detBk[cell_index]
+        # Loop over test shape functions
+        for i in 1:n_basefuncs
+            B = β(points_e[:,q_index]);
+            G = k(points_e[:,q_index]);
+            v = shapef[i, q_index]
+            ∇v = ∇shapef[:, i, q_index]
+            # Add contribution to fe
+            fe[i] += f(q_point) * v * dΩ
+            # Loop over trial shape functions
+            for j in 1:n_basefuncs
+                ∇u = ∇shapef[:, j, q_index]
+                u = shapef[j, q_index]
+                # Add contribution to Ke
+                Ke[i, j] += ((∇v ⋅ ∇u) * G + (B ⋅ ∇v) * u ) * dΩ
+            end
+        end
+    end
     return Ke, fe
-
 end
 
 ########################### DARCY PROBLEM ###########################
