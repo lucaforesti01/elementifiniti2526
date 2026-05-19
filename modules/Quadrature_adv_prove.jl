@@ -19,36 +19,53 @@ struct TriQuad
     weights::Array
 end
 
-###########################################################################
-# Definisco gli elementi della struttura "TriQuad" contenente le formule di quadratura:
-# name: è il nome della regola di quadratura (ad esempio, "Q0", "Q1", "Q2");
-# order: è il grado di precisione della quadratura;
-# points: è una matrice 2×q che contiene le coordinate dei punti di quadratura sull’elemento di riferimento;
-# weights: è un vettore di lunghezza q che contiene i pesi associati ai punti di quadratura
-###########################################################################
+Q0_ref = TriQuad(
+    "Q0",
+    2,
+    reshape([
+            1 / 3;
+            1 / 3
+        ], (2, 1)),
+    [1 / 2]
+)
 
-###########################################################################
-# Definisco le matrici dei punti di quadratura per le formule Q0, Q1, Q2.
-###########################################################################
-M0 = zeros(2,1);
-M0[1,1]=1/3;
-M0[2,1]=1/3;
+Q1_ref = TriQuad(
+    "Q1",
+    2,
+    [
+        0.0 1.0 0.0;
+        0.0 0.0 1.0
+    ],
+    [
+        1/6 1/6 1/6
+    ]
+)
 
-M1 = [0 1 0; 0 0 1];
+Q2_ref = TriQuad(
+    "Q2",
+    3,
+    [
+        0.5 0.5 0.0;
+        0.0 0.5 0.5
+    ],
+    [
+        1/6 1/6 1/6
+    ]
+)
 
-M2 = [0.5 0 0.5; 0 0.5 0.5];
-
-###########################################################################
-# Definisco i vettori dei pesi di quadratura per le formule Q0, Q1, Q2.
-###########################################################################
-
-W0 = [0.5];
-W1 = (1/6)*ones(3);
-W2 = (1/6)*ones(3);
-
-Q0_ref = TriQuad("Q0", 2, M0, W0);
-Q1_ref = TriQuad("Q1", 2, M1, W1);
-Q2_ref = TriQuad("Q2", 3, M2, W2);
+# using Gridap
+# polytope = Gridap.CellData.TRI# Create a quadrature rule of desired degree
+# degree = 4  # Choose your desired polynomial degree
+# quad = Gridap.ReferenceFEs.Quadrature(polytope, degree)
+# points = get_coordinates(quad)  # Points on reference triangle
+# weights = get_weights(quad)     # Corresponding weights
+# points = hcat([collect(Gridap.TensorValues.mutable(vv)) for vv in points]...)
+# Q3_ref = TriQuad(
+#     "Q3",
+#     2,
+#     points,
+#     weights,
+# )
 
 """
     Quadrature(u, mesh::Mesh, ref_quad::TriQuad)
@@ -63,51 +80,25 @@ Perform numerical integration of a function over a mesh using a given quadrature
 # Returns
 - `I_approx::Float64`: The approximate integral of the function over the mesh.
 """
-
-
-
-
-
-
-
-
-
 function Quadrature(u, mesh::Mesh, ref_quad::TriQuad)
-    ###########################################################################
-    # Calcola l'integrale di una funzione sul dominio triangolato dalla mesh
-    ###########################################################################
-    # Inizializza l'integrale = 0
-    I = 0;
+    # Compute matrices for pushforward of reference element
+    Bk, ak = get_Bk!(mesh)
+    # Compute the absolute value of the determinant
+    detBk = get_detBk!(mesh)
+    # Get quadrature points and weights on the reference element
+    points_refelem, weights_refelem = ref_quad.points, ref_quad.weights
+    points_elem = zeros(Float64, size(points_refelem))
+    u_evals = zeros(Float64, size(weights_refelem))
 
-    # richiama i punti e pesi di quadratura del triangolo di riferimento (da TriQuad)
-    PQ = ref_quad.points;
-    WQ = ref_quad.weights;
-    q = length(WQ);
-
-    # richiama l'array di matrici di trasformazioni Bk e ak (da mesh) e i determinanti detBk
-    Bk, ak = get_Bk!(mesh);
-    detBk = get_detBk!(mesh);
-    Tri = mesh.T;
-
-    for i in eachindex(axes(Tri,2))
-        T=0; # integrale sul singolo triangolo
-        B = Bk[:, :, i];
-        a = ak[:, i];
-        d = abs(detBk[i]);
-        for j in 1:q
-            p = PQ[:,j];
-            w = WQ[j];
-            # Calcola la trasformazione del punto di quadratura tramite mappa affine Bx + a
-            pT = B*p + a;
-            T += w * u(pT);
-            
-        end
-        I += d*T
+    # Loop across all elements
+    n_tri = size(mesh.T, 2)
+    I_approx::Float64 = 0
+    for i = 1:n_tri
+        points_elem = Bk[:, :, i] * points_refelem .+ ak[:, i] # Points in the current element
+        u_evals = eval_u(u, points_elem, mesh, i, ref_quad)
+        I_approx += sum(u_evals .* weights_refelem) * detBk[i]
     end
-
-    return I
-
-
+    return I_approx
 end
 
 # Evaluation of a function
@@ -127,19 +118,7 @@ Evaluate a function at given points within an element.
 - `u_evals::Matrix`: The evaluated function values at the given points.
 """
 function eval_u(u::Function, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
-    ###########################################################################
-    # Prende una matrice di punti e restituisce una matrice che contiene la 
-    # valutazione della funzione u su ognuno dei punti
-    ###########################################################################
-    l = size(points_elem, 2);
-    u_evals = zeros(1,l);
-    for i in 1:l
-        p = points_elem[:, i];
-        u_evals[1, i] = u(p);
-    end
-
-    return u_evals
-
+    return mapslices(u, points_elem, dims=1)
 end
 
 """
@@ -158,36 +137,12 @@ Evaluate a linear finite element solution at given quadrature points within an e
 - `uh_evals::Matrix`: The evaluated solution values at the given points.
 """
 function eval_u(uh::Vector, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
-    ###########################################################################
-    # Prende il vettore uh che corrisponde all'approssimazione lineare della soluzione 
-    # su un elemento, valuta questa funzione sui nodi di quadratura del dato elemento
-    ###########################################################################
-
-
-    # Punti di quadratura del metodo per il triangolo di riferimento:
-    PQ = quadrule.points
-
-    # Punti di quadratura del metodo per il triangolo generico trasformato: prende 
-    # ogni punto della matrice PQ e lo trasforma secondo la trasformazione dell'elemento 
-    # scelto: dipende dall'indice del triangolo tri_idx
-    T = mesh.T;
-    PT = PQ;
-    Bk, ak = get_Bk!(mesh);
-    for i in 1:size(PQ,2)
-        PT[:, i]= Bk[tri_idx]*PQ[:, i] + ak[tri_idx];
-    end
-
-    # Di tutti i valori di uh estraggo quelli che mi interessano, cioè dell'elemento (loc)
-    # corrispondente a tri_idx: 
-    uh_loc = [uh[i] for i in T[:, tri_idx]];
-
-    # Inizializza 
-    uh_evals = zeros(1,size(PT, 2));
-
-
-
+    shapef = shapef_2DLFE(quadrule)
+    triangle = mesh.T[:, tri_idx]
+    coeff = uh[triangle]
+    coeff = reshape(coeff, (1, length(coeff)))
+    return coeff * shapef
 end
-
 
 """
     L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
@@ -207,40 +162,27 @@ function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
     ###########################################################################
     # restituisce l'errore in norm L2 
     ###########################################################################
-    W = ref_quad.weights;
-    Q = ref_quad.points;
-    Bk, ak = get_Bk!(mesh);
-    det_Bk = get_detBk!(mesh);
-    T = mesh.T;
+    W = ref_quad.weights
+    Q = ref_quad.points
+    Bk, ak = get_Bk!(mesh)
+    det_Bk = get_detBk!(mesh)
+    # ciclo sui triangoli
+    I = 0
+    for t = 1:size(mesh.T, 2)
+        #trasforma i punti di quadratura
+        Q_trasf = Bk[:, :, t]*Q .+ ak[:, t]
+        # valuta la soluzione uh sui punti di quadratura trasformati e la funzione u sugli stessi punti 
+        uh_ev = eval_u(uh, Q_trasf, mesh, t, ref_quad)
+        u_ev = eval_u(u, Q_trasf, mesh, t, ref_quad)
 
-    # valutazioni delle funzioni di base sui punti di quadratura di riferimento
-    φ_val = shapef_2DLFE(ref_quad);
+        I += sum((u_ev-uh_ev) .^2 .* W) * det_Bk[t]
 
-    L2_error_square = 0 
-    # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
-    for t in size(T,2)
+    end 
 
-        # richiama le quantità sull'elemento t fissato
-        a = ak[:, t];
-        B = Bk[:,:, t];
-        det_B = det_Bk[t]
-
-        p = B*Q.+a; # matrice 2*q
-        # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
-        uh_t = uh[T[:,t]];
-
-        u_ev = u.(eachcol(p)); # valutazione di u sui punti di quadratura del triangolo t 
-        uh_ev = φ_val' * uh_t
+    L2error = sqrt(I)
+    return L2error
 
 
-        L2_error_square += sum((u_ev - uh_ev).^2 .* W * det_B)
-
-
-    end
-
-    # Calcola l'errore come la radice quadrata dell'integrale
-    L2_error = sqrt(L2_error_square);
-    return L2_error
 
 
 end
@@ -260,57 +202,33 @@ Compute the H1 semi-norm error between the gradient of a function and a finite e
 - `H1_semi_error::Float64`: The H1 semi-norm error between the gradient of the exact solution and the finite element solution.
 """
 function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
-    ###########################################################################
-    # Calcola l'errore in seminorma H1
-    ########################################################################### 
-    W = ref_quad.weights;
-    Q = ref_quad.points;
-    Bk, ak = get_Bk!(mesh);
-    det_Bk = get_detBk!(mesh);
-    inv_Bk = get_invBk!(mesh);
-    T = mesh.T;
+    # Compute matrices for pushforward of reference element
+    Bk, ak = get_Bk!(mesh)
+    # Compute the absolute value of the determinant
+    detBk = get_detBk!(mesh)
+    invBk = get_invBk!(mesh)
+    # Get quadrature points and weights on the reference element
+    points_refelem, weights_refelem = ref_quad.points, ref_quad.weights
+    ∇shapef_refelem = ∇shapef_2DLFE(ref_quad)
+    points_elem = zeros(Float64, size(points_refelem))
+    u_evals = zeros(Float64, size(weights_refelem))
 
-    # valutazioni dei gradienti delle funzioni di base sui punti di quadratura di riferimento
-    ∇φ_val = ∇shapef_2DLFE(ref_quad)
-
-    H1_semi_error_square = 0 
-    # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
-    for t in size(T,2)
-
-        # richiama le quantità sull'elemento t fissato
-        a = ak[:, t];
-        B = Bk[:,:, t];
-        inv_B = inv_Bk[:, :, t];
-        det_B = det_Bk[t]
-        
-        # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
-        uh_t = uh[T[:,t]];
-
-        # ciclo sui punti di quadratura
-        for j = 1:size(Q,2)
-            q = Q[:, j] # j-esimo punto di quadratura sul triangolo di riferimento
-
-            # somma sui vertici del triangolo dei valori di uh e dei gradienti delle funzioni di base
-            ∇uh_j = zeros(2)
-            for i =1:3
-                ∇uh_j += uh_t[i] * ( (inv_B)'* ∇φ_val[:,i,j]   );
-            end 
-
-
-
-            H1_semi_error_square += abs(det_B)* W[j] * (norm(   ∇u( B*q + a) -  ∇uh_j ))^2 
-        end 
-
-
+    # Loop across all elements
+    n_tri = size(mesh.T, 2)
+    I_approx::Float64 = 0
+    for i = 1:n_tri
+        points_elem = Bk[:, :, i] * points_refelem .+ ak[:, i] # Points in the current element
+        # Gradient of the exact solution
+        ∇u_evals = mapslices(∇u, points_elem, dims=1)
+        # Gradient of the FEM solution
+        ∇uh_evals = zeros(size(∇u_evals))
+        ∇shapef = mapslices(x -> invBk[:, :, i]' * x, ∇shapef_refelem, dims=(1, 2))
+        triangle = mesh.T[:, i]
+        coeff = uh[triangle]
+        for j = 1:length(weights_refelem)
+            ∇uh_evals[:, j] = ∇shapef[:, :, j] * coeff
+        end
+        I_approx += sum(sum((∇u_evals-∇uh_evals) .^2, dims = 1) .* weights_refelem) * detBk[i]
     end
-
-    # Calcola l'errore come la radice quadrata dell'integrale
-    H1_semi_error = sqrt(H1_semi_error_square);
-    return H1_semi_error
-
-
-
-
-
+    return sqrt(I_approx)
 end
-

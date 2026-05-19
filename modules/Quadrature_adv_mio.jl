@@ -158,34 +158,15 @@ Evaluate a linear finite element solution at given quadrature points within an e
 - `uh_evals::Matrix`: The evaluated solution values at the given points.
 """
 function eval_u(uh::Vector, points_elem::Matrix, mesh::Mesh, tri_idx::Integer, quadrule::TriQuad)
-    ###########################################################################
-    # Prende il vettore uh che corrisponde all'approssimazione lineare della soluzione 
-    # su un elemento, valuta questa funzione sui nodi di quadratura del dato elemento
-    ###########################################################################
 
-
-    # Punti di quadratura del metodo per il triangolo di riferimento:
-    PQ = quadrule.points
-
-    # Punti di quadratura del metodo per il triangolo generico trasformato: prende 
-    # ogni punto della matrice PQ e lo trasforma secondo la trasformazione dell'elemento 
-    # scelto: dipende dall'indice del triangolo tri_idx
-    T = mesh.T;
-    PT = PQ;
-    Bk, ak = get_Bk!(mesh);
-    for i in 1:size(PQ,2)
-        PT[:, i]= Bk[tri_idx]*PQ[:, i] + ak[tri_idx];
-    end
-
-    # Di tutti i valori di uh estraggo quelli che mi interessano, cioè dell'elemento (loc)
-    # corrispondente a tri_idx: 
-    uh_loc = [uh[i] for i in T[:, tri_idx]];
-
-    # Inizializza 
-    uh_evals = zeros(1,size(PT, 2));
-
-
-
+    shapef = shapef_2DLFE(quadrule)
+    # vertici del triangolo scelto
+    triangle = mesh.T[:, tri_idx]
+    # valori di uh sui vertici del triangolo scelto
+    coeff = uh[triangle]
+    # trasforma l'array in una matrice 
+    coeff = reshape(coeff, (1, length(coeff)))
+    return coeff * shapef
 end
 
 
@@ -218,7 +199,7 @@ function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
 
     L2_error_square = 0 
     # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
-    for t in size(T,2)
+    for t = 1:size(T,2)
 
         # richiama le quantità sull'elemento t fissato
         a = ak[:, t];
@@ -232,7 +213,7 @@ function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
         u_ev = u.(eachcol(p));
         uh_ev = φ_val'* uh_t
 
-        L2_error_square = sum((u_ev - uh_ev).^2 ⋅ W * (abs(det_B)))
+        L2_error_square += sum((u_ev - uh_ev).^2 .* W )* (abs(det_B))
 
 
 
@@ -283,11 +264,9 @@ function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
     ∇φ = ∇shapef_2DLFE(ref_quad);
     
 
-    
-
     H1_semi_error_square = 0 
     # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
-    for t in size(T,2)
+    for t = 1:size(T,2)
 
         # richiama le quantità sull'elemento t fissato
         a = ak[:, t];
