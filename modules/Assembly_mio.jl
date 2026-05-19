@@ -396,7 +396,7 @@ function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_inde
                 ∇v = ∇φe[:,i, p];
 
                 # aggiorna il load vector
-                fe[i] += (f(pe[:, p]) * v   + f(pe[:, p]) * (βp ⋅ ∇v)) * dΩ;
+                fe[i] += (f(pe[:, p]) * v   + τh * f(pe[:, p]) * (βp ⋅ ∇v)) * dΩ;
 
                 for j = 1:3
                     # calcola la j-esima funzione di base sul punto p di quadratura 
