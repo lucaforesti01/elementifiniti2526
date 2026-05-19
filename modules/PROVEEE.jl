@@ -86,5 +86,9 @@ repeat(A, 1, 1, 3)
 
 Ke = zeros(Float64, 3, 3)
 
+a = [1, 2, 3, 4, 5]
+b = reshape(a, (1, length(a)))
 
+typeof(a)
+typeof(b)
 
