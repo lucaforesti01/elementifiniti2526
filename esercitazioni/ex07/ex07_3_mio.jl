@@ -5,9 +5,9 @@ begin
     using Revise
 
     # Load the necessary files
-    includet("../../modules/Meshing.jl")
-    includet("../../modules/Quadrature_adv.jl")
-    includet("../../modules/Assembly.jl")
+    includet("../../modules/Meshing_mio.jl")
+    includet("../../modules/Quadrature_adv_mio.jl")
+    includet("../../modules/Assembly_mio.jl")
 
     import Meshes
     using Plots
@@ -97,6 +97,6 @@ for ϵ = ϵ_vec
     xlabel!(L"$h$")
     ylabel!(L"${\|\|u-u_h \|\|}_{L^2(\Omega)}$")
     plot!(legend=:bottomright)
-    savefig(plt, "./figures_julia/ex07_3_eps$ϵ.pdf") # Save plot
+    savefig(plt, "./figures/ex07_3_eps$ϵ.pdf") # Save plot
     plot(plt) # Show plot
 end

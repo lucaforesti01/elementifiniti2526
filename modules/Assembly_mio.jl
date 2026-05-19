@@ -229,7 +229,7 @@ function poisson_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index:
             # formula di quadratura punto medio (non dipende dal punto medio perché 
             # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
             # 1/2 = area triangolo di riferimento 
-            Ke[i,j] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j)   );
+            Ke[j,i] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j)   );
         end
     end
 
@@ -293,37 +293,154 @@ function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_inde
     ∇φ = ∇shapef_2DLFE(quadrule);
     ∇φe = mapslices(x -> invB' * x, ∇shapef_2DLFE(quadrule), dims=(1, 2)); # matrice 2x3xquad.points con le facce tutte uguali contenente i gradienti trasformati
 
+    
+    
+
+
     for p = 1:size(quadrule.points, 2)
         # peso di quadratura riscalato moltiplicando per il valore assoluto del determinante della matrice di trasformazione
         dΩ = quadrule.weights[p] * abs(detB);
         # calcola la funzione ε sul punto di quadratura p trasformato
         ε = k(pe[:, p]);
+
+        
         # calcola la funzione β sul punto di quadratura p trasformato
         βp = β(pe[:, p]);
+        norm_β = norm(βp); # calcola la norma del vettore β
+        norm_inf_β = maximum(norm.(β.(eachcol(pe)),Inf)) # calcola la norma infinito del vettore \beta sul triangolo
+        n_β = βp/norm_β; # calcola la direzione del vettore β per NCSD
 
-        for i = 1:3
-            # calcola l' i-esima funzione di base sul punto p di quadratura 
-            v = φe[i, p]; 
-            # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
-            ∇v = ∇φe[:,i, p];
+        # calcola εh per il metodo NCAD
+        hT = max(norm(B[:,1]), norm(B[:, 2]), norm(B[:,1]-B[:,2]))
+        εh = 0.5 * norm_β * hT;
 
-            # aggiorna il load vector
-            fe[i] += f(pe[:, p]) * v * dΩ;
+        # calcola τh per SUPG
+        τh = δ * (hT/norm_inf_β)
 
-            for j = 1:3
-                # calcola la j-esima funzione di base sul punto p di quadratura 
-                u = φe[j, p]; 
-                # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
-                ∇u = ∇φe[:,j, p];
 
-                # aggiorna la matrice di stiffness
-                Ke[i,j] += ((∇v ⋅ ∇u) * ε + (βp ⋅ ∇v) * u ) * dΩ
+
+
+
+        if stab == "NCAD"
+        #############################################################################################
+        # TRASPORTO NCAD
+        #############################################################################################
+
+            for i = 1:3
+                # calcola l' i-esima funzione di base sul punto p di quadratura 
+                v = φe[i, p]; 
+                # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
+                ∇v = ∇φe[:,i, p];
+
+                # aggiorna il load vector
+                fe[i] += f(pe[:, p]) * v * dΩ;
+
+                for j = 1:3
+                    # calcola la j-esima funzione di base sul punto p di quadratura 
+                    u = φe[j, p]; 
+                    # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
+                    ∇u = ∇φe[:,j, p];
+
+                    # aggiorna la matrice di stiffness
+                    Ke[j,i] += ((∇v ⋅ ∇u) * εh + (βp ⋅ ∇v) * u ) * dΩ
+
+                end 
+
+            end
+
+
+
+
+
+
+
+
+
+        elseif stab == "NCSD"
+        #############################################################################################
+        # TRASPORTO NCSD
+        #############################################################################################
+
+            for i = 1:3
+                # calcola l' i-esima funzione di base sul punto p di quadratura 
+                v = φe[i, p]; 
+                # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
+                ∇v = ∇φe[:,i, p];
+
+                # aggiorna il load vector
+                fe[i] += f(pe[:, p]) * v * dΩ;
+
+                for j = 1:3
+                    # calcola la j-esima funzione di base sul punto p di quadratura 
+                    u = φe[j, p]; 
+                    # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
+                    ∇u = ∇φe[:,j, p];
+
+                    # aggiorna la matrice di stiffness
+                    Ke[j,i] += ((∇v ⋅ ∇u) * ε + (βp ⋅ ∇v) * u + εh * (n_β ⋅ ∇v) * (n_β ⋅ ∇u)) * dΩ
+
+                end 
+
+            end
+
+
+        elseif stab == "SUPG"
+        #############################################################################################
+        # TRASPORTO SUPG
+        #############################################################################################
+            
+            for i = 1:3
+                # calcola l' i-esima funzione di base sul punto p di quadratura 
+                v = φe[i, p]; 
+                # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
+                ∇v = ∇φe[:,i, p];
+
+                # aggiorna il load vector
+                fe[i] += (f(pe[:, p]) * v   + f(pe[:, p]) * (βp ⋅ ∇v)) * dΩ;
+
+                for j = 1:3
+                    # calcola la j-esima funzione di base sul punto p di quadratura 
+                    u = φe[j, p]; 
+                    # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
+                    ∇u = ∇φe[:,j, p];
+
+                    # aggiorna la matrice di stiffness
+                    Ke[j,i] += ((∇v ⋅ ∇u) * ε + (βp ⋅ ∇v) * u + τh * (βp ⋅ ∇v) * (βp ⋅ ∇u)) * dΩ
+
+                end 
+
+            end
+
+
+        else
+        #############################################################################################
+        # TRASPORTO STANDARD
+        #############################################################################################
+        
+
+            for i = 1:3
+                # calcola l' i-esima funzione di base sul punto p di quadratura 
+                v = φe[i, p]; 
+                # calcola il gradiente dell' i-esima funzione di base sul punto p di quadratura trasformato
+                ∇v = ∇φe[:,i, p];
+
+                # aggiorna il load vector
+                fe[i] += f(pe[:, p]) * v * dΩ;
+
+                for j = 1:3
+                    # calcola la j-esima funzione di base sul punto p di quadratura 
+                    u = φe[j, p]; 
+                    # calcola il gradiente della j-esima funzione di base sul punto p di quadratura trasformato
+                    ∇u = ∇φe[:,j, p];
+
+                    # aggiorna la matrice di stiffness
+                    Ke[j,i] += ((∇v ⋅ ∇u) * ε + (βp ⋅ ∇v) * u ) * dΩ
+
+                end 
 
             end 
 
-        end 
-
-
+        end # end if 
 
     end 
 
@@ -399,7 +516,7 @@ function darcy_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::I
             # formula di quadratura punto medio (non dipende dal punto medio perché 
             # i gradienti delle funzioni di base sul triangolo di riferimento sono costanti)
             # 1/2 = area triangolo di riferimento 
-            Ke[i,j] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j) * k(P0_trasf)  );
+            Ke[j,i] = 1/2 * abs(detB) * dot(    (B_inv' * ∇Q0_i), (B_inv' * ∇Q0_j) * k(P0_trasf)  );
         end
     end
 

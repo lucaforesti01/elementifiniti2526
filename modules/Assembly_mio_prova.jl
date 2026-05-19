@@ -260,42 +260,76 @@ Assemble the local stiffness matrix and force vector for the transport problem.
 - `fe`: The assembled local force vector.
 """
 function transport_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k, β; stab = nothing, δ = 0.5)
-    n_basefuncs = 3
-    # Reset to 0
+    B, a = get_Bk!(mesh)
+    detB = get_detBk!(mesh)
+    invB = get_invBk!(mesh)
+
+    Bk = B[:, :, cell_index]
+    ak = a[:, cell_index]
+    detBk = detB[cell_index]
+    invBk = invB[:, :, cell_index]
+    h_t = maximum(norm, [Bk[:,1], Bk[:,2], Bk[:,1] - Bk[:,2]])
+
+    ref_quad = Q2_ref
+    phi_grad = ∇shapef_2DLFE(ref_quad) 
+    phi_val = shapef_2DLFE(ref_quad)
+    WQ = ref_quad.weights
+    PQ = ref_quad.points
+
+    PQ_trasf = Bk * PQ .+ ak
+
+
+    # Inizializzo le nuove Ke e f a zero
     fill!(Ke, 0)
     fill!(fe, 0)
-    # FIXME: It is sufficient to use Q0 quadrule to assemble the stiffness matrix exactly,
-    # but here we show how to use a more general quadrature rule like Q2    
-    quadrule = Q2_ref
-    points_e = mesh.Bk[:, :, cell_index] * quadrule.points .+ mesh.ak[:, cell_index]
-    # Evaluate basis functions and their gradient
-    shapef = shapef_2DLFE(quadrule)
-    invBk = mesh.invBk[:, :, cell_index]
-    ∇shapef = mapslices(x -> invBk' * x, ∇shapef_2DLFE(quadrule), dims=(1, 2))
-    # Loop over quadrature points
-    for (q_index, q_point) in enumerate(eachcol(points_e))
-        # Get the quadrature weight
-        dΩ = quadrule.weights[q_index] * mesh.detBk[cell_index]
-        # Loop over test shape functions
-        for i in 1:n_basefuncs
-            B = β(points_e[:,q_index]);
-            G = k(points_e[:,q_index]);
-            v = shapef[i, q_index]
-            ∇v = ∇shapef[:, i, q_index]
-            # Add contribution to fe
-            fe[i] += f(q_point) * v * dΩ
-            # Loop over trial shape functions
-            for j in 1:n_basefuncs
-                ∇u = ∇shapef[:, j, q_index]
-                u = shapef[j, q_index]
-                # Add contribution to Ke
-                Ke[i, j] += ((∇v ⋅ ∇u) * G + (B ⋅ ∇v) * u ) * dΩ
+
+    for i in 1:3
+        for t in 1:size(PQ, 2) # sommo su tutti i nodi di quadratura
+            if stab == "SUPG"
+                fattore_∇phi_i = transpose(invBk) * phi_grad[:, i, :]
+                tau_h = δ * h_t / maximum(norm.(β.(eachcol(PQ_trasf)), Inf))
+                fe[i] += f(PQ_trasf[:, t]) * phi_val[i, t] * detBk * WQ[t] + tau_h * f(PQ_trasf[:, t]) * dot(β(PQ_trasf[:, t]), fattore_∇phi_i[:, t]) * detBk * WQ[t]
+            else
+                fe[i] += f(PQ_trasf[:, t])*phi_val[i, t] * detBk * WQ[t]
+            end
+        end
+
+        for j in 1:3
+            for s in 1:size(WQ, 2)
+                fattore_∇phi_i = transpose(invBk) * phi_grad[:, i, :]
+                fattore_∇phi_j = transpose(invBk) * phi_grad[:, j, :]
+                
+                if stab == "NCAD"
+                    eps_h = 0.5 * norm(β(PQ_trasf[:, s])) * h_t
+                    Ke[i, j] += eps_h * detBk * WQ[s] * dot(fattore_∇phi_j[:, s], fattore_∇phi_i[:, s]) + 
+                    dot(β(PQ_trasf[:, s]), fattore_∇phi_j[:, s]) * phi_val[i, s] * detBk * WQ[s]
+
+                elseif stab == "NCSD"
+                    eps_h = 0.5 * norm(β(PQ_trasf[:, s])) * h_t
+                    n_β = β(PQ_trasf[:, s]) / norm(β(PQ_trasf[:, s]))
+                    Ke[i, j] += k(PQ_trasf[:, s]) * detBk * WQ[s] * dot(fattore_∇phi_j[:, s], fattore_∇phi_i[:, s]) + 
+                    dot(β(PQ_trasf[:, s]), fattore_∇phi_j[:, s]) * phi_val[i, s] * detBk * WQ[s] + 
+                    eps_h * detBk * WQ[s] * dot(n_β, fattore_∇phi_j[:, s]) * dot(n_β, fattore_∇phi_i[:, s])
+
+                elseif stab == "SUPG"
+                    tau_h = δ * h_t / maximum(norm.(β.(eachcol(PQ_trasf)), Inf))
+                    Ke[i, j] += detBk * WQ[s] * k(PQ_trasf[:, s]) * dot(fattore_∇phi_j[:, s], fattore_∇phi_i[:, s]) + 
+                    dot(β(PQ_trasf[:, s]), fattore_∇phi_j[:, s]) * phi_val[i, s] * detBk * WQ[s] +
+                    tau_h * dot(β(PQ_trasf[:, s]), fattore_∇phi_j[:, s]) * dot(β(PQ_trasf[:, s]), fattore_∇phi_i[:, s]) * detBk * WQ[s]
+
+
+                else
+                    Ke[i, j] += k(PQ_trasf[:, s]) * detBk * WQ[s] * dot(fattore_∇phi_j[:, s], fattore_∇phi_i[:, s]) + 
+                    dot(β(PQ_trasf[:, s]), fattore_∇phi_j[:, s]) * phi_val[i, s] * detBk * WQ[s]
+
+                end
+
             end
         end
     end
+
     return Ke, fe
 end
-
 ########################### DARCY PROBLEM ###########################
 """
     darcy_assemble_local!(Ke::Matrix, fe::Vector, mesh::Mesh, cell_index::Integer, f, k)

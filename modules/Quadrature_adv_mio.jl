@@ -228,17 +228,21 @@ function L2error(u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
         # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
         uh_t = uh[T[:,t]];
 
-        # ciclo sui punti di quadratura
-        for j = 1:size(Q,2)
-            q = Q[:, j] # j-esimo punto di quadratura
+        p = B * Q .+ a;
+        u_ev = u.(eachcol(p));
+        uh_ev = φ_val'* uh_t
 
-            
-            φ_j =  φ_val[:,j] # tutte le funzioni di base, valutate sul j-esimo punto di quadratura
-            uh_val_j = dot(uh_t, φ_j) # valutazione della funzione approssimata uh sul j-esimo punto di quadratura (uh combinazione delle φi)
+        L2_error_square = sum((u_ev - uh_ev).^2 ⋅ W * (abs(det_B)))
 
 
-            L2_error_square += abs(det_B)* W[j] * (abs(   u( B*q + a) -  uh_val_j ))^2 
-        end 
+
+        # # ciclo sui punti di quadratura
+        # for j = 1:size(Q,2)
+        #     q = Q[:, j] # j-esimo punto di quadratura
+        #     φ_j =  φ_val[:,j] # tutte le funzioni di base, valutate sul j-esimo punto di quadratura
+        #     uh_val_j = dot(uh_t, φ_j) # valutazione della funzione approssimata uh sul j-esimo punto di quadratura (uh combinazione delle φi)
+        #     L2_error_square += abs(det_B)* W[j] * (abs(   u( B*q + a) -  uh_val_j ))^2 
+        # end 
 
 
     end
@@ -276,7 +280,10 @@ function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
     T = mesh.T;
 
     # valutazioni dei gradienti delle funzioni di base sui punti di quadratura di riferimento
-    ∇φ_val = ∇shapef_2DLFE(ref_quad)
+    ∇φ = ∇shapef_2DLFE(ref_quad);
+    
+
+    
 
     H1_semi_error_square = 0 
     # Ciclo sui triangoli (calcola gli integrali localmente e li somma)
@@ -287,24 +294,40 @@ function H1semierror(∇u::Function, uh::Vector, mesh::Mesh, ref_quad::TriQuad)
         B = Bk[:,:, t];
         inv_B = inv_Bk[:, :, t];
         det_B = det_Bk[t]
+
+        p = B * Q .+ a; # punti di quadratura trasformati
         
         # valori della funzione approssimata uh sui tre vertici del triangolo t fissato
         uh_t = uh[T[:,t]];
 
-        # ciclo sui punti di quadratura
-        for j = 1:size(Q,2)
-            q = Q[:, j] # j-esimo punto di quadratura sul triangolo di riferimento
+        # gradienti trasformati 
 
-            # somma sui vertici del triangolo dei valori di uh e dei gradienti delle funzioni di base
-            ∇uh_j = zeros(2)
-            for i =1:3
-                ∇uh_j += uh_t[i] * ( (inv_B)'* ∇φ_val[:,i,j]   );
-            end 
+        ∇φ_trasf = mapslices(x -> inv_B' * x, ∇shapef_2DLFE(ref_quad), dims=(1, 2) )
+        ∇uh = dropdims(mapslices(x -> x * uh_t, ∇φ_trasf, dims=(1, 2) ); dims=2) # ho trasformato ogni slice ottenendo 2x1xq ma voglio un vettore 2xq
+        ∇u_ev = hcat(∇u.(eachcol(p))...) # i ... servono a spacchettare una collezione nei suoi elementi individuali
+        H1_semi_error_square += abs(det_B) * (norm.(eachcol(∇uh - ∇u_ev))).^2 ⋅ W 
 
 
+        ####### VERSIONE ALTERNATIVA ######
+        # ∇φ_trasf = mapslices(x -> inv_B' * x, ∇φ, dims=(1, 2));
+        # ∇uh = dropdims(mapslices(x ->  x * uh_t, ∇φ_trasf, dims=(1, 2)); dims=2); # ho trasformato ogni slice ottenendo 2x1xq ma voglio un vettore 2xq
+        # ∇u_ev = hcat(∇u.(eachcol(p))...);
+        # H1_semi_error_square += abs(det_B) * (norm.(eachcol(eachslice(∇uh, dims=(2,3)).- ∇u_ev))).^2 ⋅ W
 
-            H1_semi_error_square += abs(det_B)* W[j] * (norm(   ∇u( B*q + a) -  ∇uh_j ))^2 
-        end 
+
+
+        ###### SENZA CALCOLO CON LE MATRICI ######
+
+            # ciclo sui punti di quadratura
+        #     for j = 1:size(Q,2)
+        #         q = Q[:, j] # j-esimo punto di quadratura sul triangolo di riferimento
+        #         # somma sui vertici del triangolo dei valori di uh e dei gradienti delle funzioni di base
+        #         ∇uh_j = zeros(2)
+        #         for i =1:3
+        #             ∇uh_j += uh_t[i] * ( (inv_B)'* ∇φ_val[:,i,j]   );
+        #         end 
+        #         H1_semi_error_square += abs(det_B)* W[j] * (norm(   ∇u( B*q + a) -  ∇uh_j ))^2 
+        #     end 
 
 
     end

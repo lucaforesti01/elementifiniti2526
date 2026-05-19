@@ -86,3 +86,5 @@ repeat(A, 1, 1, 3)
 
 Ke = zeros(Float64, 3, 3)
 
+
+
